@@ -104,6 +104,8 @@ class VisualGridHuntGame:
         
         if tuple(self.agent_pos) in self.toxic_traps:
             self.score -= 15
+            
+        
 
     def is_done(self) -> bool:
         return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
@@ -169,6 +171,18 @@ class GridGameGUI:
             y1 = (self.env.height - 1 - oy) * self.cell_size + offset
             self.canvas.create_rectangle(x1, y1, x1 + self.cell_size * 0.6, y1 + self.cell_size * 0.6, fill="#990000",
                                          outline="#7a0000")
+            
+        for tx, ty in self.env.toxic_traps:
+                    offset = self.cell_size * 0.2
+                    x1 = tx * self.cell_size + offset
+                    y1 = (self.env.height - 1 - ty) * self.cell_size + offset
+                    self.canvas.create_oval(
+                        x1, y1,
+                        x1 + self.cell_size * 0.6,
+                        y1 + self.cell_size * 0.6,
+                        fill="#7e22ce",
+                        outline="#581c87"
+                    )
 
         ax, ay = self.env.agent_pos
         offset = self.cell_size * 0.15
