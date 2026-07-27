@@ -101,6 +101,9 @@ class VisualGridHuntGame:
             if op == self.agent_pos:
                 self.score -= 50
                 self.collision = True
+        
+        if tuple(self.agent_pos) in self.toxic_traps:
+            self.score -= 15
 
     def is_done(self) -> bool:
         return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
