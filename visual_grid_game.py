@@ -25,18 +25,20 @@ class VisualGridHuntGame:
             pos_tuple = (fx, fy)
             if pos_tuple != (0, 0) and pos_tuple not in self.walls:
                 self.food_positions.add(pos_tuple)
-
+       
+        # Generate toxic traps
         self.toxic_traps = set()
+
         while len(self.toxic_traps) < 3:
             tx = random.randint(0, self.width - 1)
             ty = random.randint(0, self.height - 1)
+
             trap_pos = (tx, ty)
-            if (
-                trap_pos != (0, 0)
-                and trap_pos not in self.walls
-                and trap_pos not in self.food_positions
-                and trap_pos not in self.toxic_traps
-            ):
+
+            if (trap_pos != (0, 0)
+                  and trap_pos not in self.walls
+                  and trap_pos not in self.food_positions):
+
                 self.toxic_traps.add(trap_pos)
 
         # Generate adversarial opponents
@@ -52,17 +54,42 @@ class VisualGridHuntGame:
         self.steps = 0
         self.collision = False
 
-    def get_percept(self) -> dict:
-        return {
-            'agent_pos': list(self.agent_pos),
-            'opponent_positions': [list(op) for op in self.opponents],
-            'smells_food': tuple(self.agent_pos) in self.food_positions,
-            'hit_wall': tuple(self.agent_pos) in self.walls,
-            'collision': self.collision,
-            'score': self.score,
-            'remaining_food': len(self.food_positions),
-            'smells_toxin': tuple(self.agent_pos) in self.toxic_traps
-        }
+    def get_percept(self):
+
+         x, y = self.agent_pos
+
+
+         # Check cell ahead
+         ahead = (x, y + 1)
+
+
+         wall_ahead = (
+         ahead in self.walls
+         or y + 1 >= self.height
+        )
+
+
+         food_here = (
+           tuple(self.agent_pos)
+           in self.food_positions
+        )
+
+
+         toxin_here = (
+        tuple(self.agent_pos)
+        in self.toxic_traps
+        )
+
+
+         return {
+
+        "wall_ahead": wall_ahead,
+
+        "food_here": food_here,
+
+        "toxin_here": toxin_here
+
+    }
 
     def execute_action(self, action: str):
         self.steps += 1
@@ -86,6 +113,9 @@ class VisualGridHuntGame:
         if tuple_pos in self.food_positions:
             self.food_positions.remove(tuple_pos)
             self.score += 20
+        # Toxic trap penalty
+        if tuple_pos in self.toxic_traps:
+            self.score -= 15
 
         for op in self.opponents:
             move = random.choice(['Up', 'Down', 'Left', 'Right', 'Stay'])
@@ -101,15 +131,74 @@ class VisualGridHuntGame:
             if op == self.agent_pos:
                 self.score -= 50
                 self.collision = True
-        
-        if tuple(self.agent_pos) in self.toxic_traps:
-            self.score -= 15
-            
-        
 
     def is_done(self) -> bool:
         return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
 
+class SimpleReflexAgent:
+
+    def sense_and_act(self, percept):
+
+        if percept["food_here"]:
+            return random.choice(
+                ["Up", "Down", "Left", "Right"]
+            )
+
+        if percept["toxin_here"]:
+            return random.choice(
+                ["Left", "Right"]
+            )
+
+        if percept["wall_ahead"]:
+            return random.choice(
+                ["Left", "Right"]
+            )
+
+        return "Up"
+    
+class ModelBasedAgent:
+    """Model-Based Agent with internal memory."""
+
+    def __init__(self):
+        self.visited_cells = set()
+        self.last_action = None
+
+    def sense_and_act(self, percept, current_position):
+        current_position = tuple(current_position)
+
+        # Update internal memory
+        self.visited_cells.add(current_position)
+
+        x, y = current_position
+
+        possible_moves = {
+            "Up": (x, y + 1),
+            "Down": (x, y - 1),
+            "Left": (x - 1, y),
+            "Right": (x + 1, y)
+        }
+
+        # The sensor says that moving Up is blocked
+        if percept["wall_ahead"]:
+            possible_moves.pop("Up", None)
+
+        # Find directions that have not been visited
+        unvisited_actions = [
+            action
+            for action, position in possible_moves.items()
+            if position not in self.visited_cells
+        ]
+
+        # Prefer an unvisited path
+        if unvisited_actions:
+            action = random.choice(unvisited_actions)
+        elif possible_moves:
+            action = random.choice(list(possible_moves.keys()))
+        else:
+            action = "Down"
+
+        self.last_action = action
+        return action
 
 class GridGameGUI:
     """Tkinter wrapper that dynamically scales cell sizes to keep larger grids on screen."""
@@ -120,7 +209,9 @@ class GridGameGUI:
 
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents,
                                       custom_walls=walls)
-
+       
+        self.agent = ModelBasedAgent()
+        
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600
         self.cell_size = max(20, min(max_canvas_dim // self.env.width, max_canvas_dim // self.env.height))
@@ -165,24 +256,19 @@ class GridGameGUI:
             self.canvas.create_oval(x1, y1, x1 + self.cell_size * 0.5, y1 + self.cell_size * 0.5, fill="#f59e0b",
                                     outline="#d97706")
 
+        # Draw toxic traps
+        for tx, ty in self.env.toxic_traps:
+            offset = self.cell_size * 0.25
+            x1 = tx * self.cell_size + offset
+            y1 = (self.env.height - 1 - ty) * self.cell_size + offset
+            self.canvas.create_oval(x1,y1,x1 + self.cell_size * 0.5,y1 + self.cell_size * 0.5,fill="purple",outline="black")
+
         for ox, oy in self.env.opponents:
             offset = self.cell_size * 0.2
             x1 = ox * self.cell_size + offset
             y1 = (self.env.height - 1 - oy) * self.cell_size + offset
             self.canvas.create_rectangle(x1, y1, x1 + self.cell_size * 0.6, y1 + self.cell_size * 0.6, fill="#990000",
                                          outline="#7a0000")
-            
-        for tx, ty in self.env.toxic_traps:
-                    offset = self.cell_size * 0.2
-                    x1 = tx * self.cell_size + offset
-                    y1 = (self.env.height - 1 - ty) * self.cell_size + offset
-                    self.canvas.create_oval(
-                        x1, y1,
-                        x1 + self.cell_size * 0.6,
-                        y1 + self.cell_size * 0.6,
-                        fill="#7e22ce",
-                        outline="#581c87"
-                    )
 
         ax, ay = self.env.agent_pos
         offset = self.cell_size * 0.15
@@ -196,7 +282,8 @@ class GridGameGUI:
 
         def step():
             if not self.env.is_done():
-                action = random.choice(['Up', 'Down', 'Left', 'Right'])
+                percept = self.env.get_percept()
+                action = self.agent.sense_and_act(percept,self.env.agent_pos)
                 self.env.execute_action(action)
 
                 self.draw_grid()
