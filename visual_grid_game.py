@@ -1,6 +1,6 @@
 import random
 import tkinter as tk
-from agent import SearchAgent  # <--- LAB 3: Importing the new Search Agent
+from agent import SearchAgent
 
 class VisualGridHuntGame:
     def __init__(self, width=10, height=10, num_food=10, num_opponents=2, custom_walls=None):
@@ -55,7 +55,6 @@ class VisualGridHuntGame:
             return (x + 1, y)
         return (x, y)
 
-    # LAB 03 - Step 1.1: Exposing the World Model
     def get_percept(self) -> dict:
         ahead_x, ahead_y = self.get_ahead_position()
 
@@ -73,11 +72,11 @@ class VisualGridHuntGame:
             "food_here": food_here,
             "smells_toxin": smells_toxin,
             
-            # --- LAB 03 NEW KEYS ---
             "agent_pos": tuple(self.agent_pos), 
             "grid_size": (self.width, self.height),
             "walls": list(self.walls),
-            "all_food": list(self.food_positions)
+            "all_food": list(self.food_positions),
+            "toxic_traps": list(self.toxic_traps)
         }
 
     def turn_left(self):
@@ -148,14 +147,13 @@ class VisualGridHuntGame:
 class GridGameGUI:
     def __init__(self, root, width=10, height=10, num_food=12, num_opponents=2, walls=None):
         self.root = root
-        self.root.title("IT3012 - Search Agents (Lab 03)")
+        self.root.title("IT3012 - Search Agents (Lab 05)")
 
         self.env = VisualGridHuntGame(
             width=width, height=height, num_food=num_food, 
             num_opponents=num_opponents, custom_walls=walls
         )
 
-        # LAB 03 AGENT INITIALIZATION
         self.agent = SearchAgent()
 
         max_canvas_dim = 600
@@ -215,7 +213,6 @@ class GridGameGUI:
         y1 = (self.env.height - 1 - ay) * self.cell_size + offset
         self.canvas.create_oval(x1, y1, x1 + self.cell_size * 0.7, y1 + self.cell_size * 0.7, fill="#000066", outline="#1e3a8a")
 
-
     def run_loop(self):
         self.btn.config(state="disabled")
 
@@ -229,14 +226,13 @@ class GridGameGUI:
                 self.label.config(
                     text=f"Score: {self.env.score} | Steps: {self.env.steps} | Algo: {self.agent.active_algo}"
                 )
-                self.root.after(150, step) # Speed slightly increased for search algorithms
+                self.root.after(150, step) 
             else:
                 end_text = f"Collision! Final Score: {self.env.score}" if self.env.collision else f"Finished! Final Score: {self.env.score}"
                 self.label.config(text=end_text)
                 self.btn.config(state="normal")
 
         step()
-
 
 if __name__ == "__main__":
     root = tk.Tk()
